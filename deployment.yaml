@@ -1,0 +1,85 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: overviewer
+  namespace: demojam-deux
+  labels:
+    app: overviewer
+    app.kubernetes.io/component: overviewer
+    app.kubernetes.io/instance: overviewer
+    app.kubernetes.io/name: overviewer
+    app.kubernetes.io/part-of: overviewer
+    app.openshift.io/runtime: build
+    app.openshift.io/runtime-namespace: demojam-deux
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: overviewer
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: overviewer
+        deployment: overviewer
+      annotations:
+        openshift.io/generated-by: OpenShiftWebConsole
+    spec:
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: minecraft-data
+        - name: overviewer
+          emptyDir: {}
+        - name: nginx-config
+          configMap:
+            name: overviewer-config
+            defaultMode: 420
+      containers:
+        - name: nginx
+          image: 'nginx:latest'
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          resources: {}
+          volumeMounts:
+            - name: overviewer
+              mountPath: /usr/share/nginx/html/
+            - name: nginx-config
+              mountPath: /usr/share/nginx/html/default.html
+              subPath: default.html
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: Always
+        - resources: {}
+          terminationMessagePath: /dev/termination-log
+          name: overviewer
+          command:
+            - /usr/bin/sh
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: data
+              readOnly: true
+              mountPath: /tmp/server/
+            - name: overviewer
+              mountPath: /tmp/export/
+          terminationMessagePolicy: File
+          image: 'image-registry.openshift-image-registry.svc:5000/demojam-deux/overviewer@sha256:8f1ce2e4b2edb12637a7c8a6e39478a210830fad2a22d3b5f6359e1537c41520'
+          args:
+            - '-c'
+            - 'while true; do /tmp/overviewer/overviewer.py --config=/tmp/config/config.py ${overviewerParams}; done'
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      schedulerName: default-scheduler
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
